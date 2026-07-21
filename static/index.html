@@ -1,24 +1,48 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>OpenTubeX APT repository</title>
-    <style>
-      body { max-width: 52rem; margin: 4rem auto; padding: 0 1rem; font: 1rem/1.6 system-ui, sans-serif; }
-      pre { overflow-x: auto; padding: 1rem; border-radius: .5rem; background: #f2f2f2; }
-    </style>
-  </head>
-  <body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenTubeX APT Repository</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
     <h1>OpenTubeX APT repository</h1>
-    <p>Install OpenTubeX on Debian or Ubuntu:</p>
-    <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
+    <p>
+      Debian and Ubuntu packages for
+      <a href="https://opentubex.org/">OpenTubeX</a>.
+    </p>
+
+    <h2>Install</h2>
+    <p>Add the repository and signing key once:</p>
+    <div class="card">
+      <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
 wget -qO- https://apt.opentubex.org/opentubex-archive-keyring.gpg \
   | sudo tee /etc/apt/keyrings/opentubex-archive-keyring.gpg &gt;/dev/null
 echo "deb [signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
   | sudo tee /etc/apt/sources.list.d/opentubex.list &gt;/dev/null
 sudo apt update
 sudo apt install opentubex</code></pre>
-    <p><a href="https://github.com/OpenTubeX/apt">Source and maintainer documentation</a></p>
-  </body>
+    </div>
+
+    <h2>Update</h2>
+    <div class="card">
+      <pre><code>sudo apt update
+sudo apt upgrade opentubex</code></pre>
+    </div>
+
+    <h2>Manual downloads</h2>
+    <p>
+      You can also download <code>.deb</code> files directly from
+      <a href="https://github.com/OpenTubeX/OpenTubeX/releases">GitHub Releases</a>.
+      Manual installs are not tied to this repository, so they do not receive
+      automatic updates through APT.
+    </p>
+
+    <p>
+      <a href="https://github.com/OpenTubeX/apt">Repository source and maintainer documentation</a>
+    </p>
+  </main>
+</body>
 </html>
