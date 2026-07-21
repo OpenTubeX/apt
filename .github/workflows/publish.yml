@@ -1,0 +1,116 @@
+name: Publish APT repository
+
+on:
+  repository_dispatch:
+    types: [opentubex-release]
+  workflow_dispatch:
+    inputs:
+      releaseTag:
+        description: Release tag to publish (for example, v0.29.0-beta)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apt-repository
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish stable repository
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      id-token: write
+      pages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Resolve release
+        id: release
+        shell: bash
+        env:
+          INPUT_TAG: ${{ github.event.client_payload.tag || inputs.releaseTag }}
+        run: |
+          set -euo pipefail
+          tag="$INPUT_TAG"
+
+          if [[ -z "$tag" ]]; then
+            tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
+          fi
+
+          if [[ ! "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
+            echo "Expected a tag like v0.29.0-beta, got: $tag" >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+
+      - name: Download Debian packages
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release-files
+          gh release download "$RELEASE_TAG" \
+            --repo OpenTubeX/OpenTubeX \
+            --dir release-files \
+            --pattern "opentubex_${VERSION}_beta_amd64.deb" \
+            --pattern "opentubex_${VERSION}_beta_arm64.deb" \
+            --pattern "opentubex_${VERSION}_beta_armv7l.deb"
+
+      - name: Install repository tools
+        run: sudo apt-get update && sudo apt-get install --yes apt-utils
+
+      - name: Import signing key
+        id: signing-key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$APT_GPG_PRIVATE_KEY" ]]; then
+            echo 'The APT_GPG_PRIVATE_KEY secret is not configured.' >&2
+            exit 1
+          fi
+
+          printf '%s\n' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          fingerprint="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+
+          if [[ -z "$fingerprint" ]]; then
+            echo 'No private signing key was imported.' >&2
+            exit 1
+          fi
+
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed repository
+        env:
+          APT_GPG_KEY_ID: ${{ steps.signing-key.outputs.fingerprint }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: ./scripts/build-repository.sh release-files repository
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Upload repository
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: repository
+
+      - name: Deploy repository
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenTubeX APT repository</title>
+    <style>
+      body { max-width: 52rem; margin: 4rem auto; padding: 0 1rem; font: 1rem/1.6 system-ui, sans-serif; }
+      pre { overflow-x: auto; padding: 1rem; border-radius: .5rem; background: #f2f2f2; }
+    </style>
+  </head>
+  <body>
+    <h1>OpenTubeX APT repository</h1>
+    <p>Install OpenTubeX on Debian or Ubuntu:</p>
+    <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
+wget -qO- https://apt.opentubex.org/opentubex-archive-keyring.gpg \
+  | sudo tee /etc/apt/keyrings/opentubex-archive-keyring.gpg &gt;/dev/null
+echo "deb [signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
+  | sudo tee /etc/apt/sources.list.d/opentubex.list &gt;/dev/null
+sudo apt update
+sudo apt install opentubex</code></pre>
+    <p><a href="https://github.com/OpenTubeX/apt">Source and maintainer documentation</a></p>
+  </body>
+</html>
