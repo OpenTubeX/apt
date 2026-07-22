@@ -85,6 +85,7 @@ gpg --batch --yes --pinentry-mode loopback \
   --armor --detach-sign --output "dists/$suite/Release.gpg" "dists/$suite/Release"
 gpg --batch --export "$APT_GPG_KEY_ID" > opentubex-archive-keyring.gpg
 
-cp ../static/CNAME ../static/index.html ../static/style.css .
+cp ../static/CNAME ../static/favicon.ico ../static/favicon.svg \
+  ../static/index.html ../static/style.css .
 touch .nojekyll
 popd >/dev/null
