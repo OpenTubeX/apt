@@ -28,6 +28,15 @@ sudo apt update
 sudo apt install opentubex</code></pre>
     </div>
 
+    <h2>Nightly builds</h2>
+    <p>To follow development snapshots, use the same key with the nightly suite:</p>
+    <div class="card">
+      <pre><code>echo "deb [signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org nightly main" \
+  | sudo tee /etc/apt/sources.list.d/opentubex.list &gt;/dev/null
+sudo apt update
+sudo apt install opentubex</code></pre>
+    </div>
+
     <h2>Update</h2>
     <div class="card">
       <pre><code>sudo apt update

@@ -2,7 +2,7 @@ name: Publish APT repository
 
 on:
   repository_dispatch:
-    types: [opentubex-release]
+    types: [opentubex-release, opentubex-nightly]
   workflow_dispatch:
     inputs:
       releaseTag:
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Publish stable repository
+    name: Publish repositories
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -36,31 +36,61 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Resolve release
+      - name: Resolve releases
         id: release
         shell: bash
         env:
           INPUT_TAG: ${{ github.event.client_payload.tag || inputs.releaseTag }}
         run: |
           set -euo pipefail
-          tag="$INPUT_TAG"
+          requested_tag="$INPUT_TAG"
+          stable_tag=''
+          nightly_tag=''
 
-          if [[ -z "$tag" ]]; then
-            tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
-          fi
-
-          if [[ ! "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
-            echo "Expected a tag like v0.29.0-beta, got: $tag" >&2
+          if [[ "$requested_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
+            stable_tag="$requested_tag"
+          elif [[ "$requested_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
+            nightly_tag="$requested_tag"
+          elif [[ -n "$requested_tag" ]]; then
+            echo "Expected a stable or nightly OpenTubeX tag, got: $requested_tag" >&2
             exit 1
           fi
 
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          if [[ -z "$stable_tag" ]]; then
+            stable_tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
+          fi
+          if [[ ! "$stable_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
+            echo "Expected a stable tag, got: $stable_tag" >&2
+            exit 1
+          fi
+          stable_version="${BASH_REMATCH[1]}"
+
+          if [[ -z "$nightly_tag" ]]; then
+            nightly_tag="$(gh release list --repo OpenTubeX/OpenTubeX --limit 100 \
+              --json createdAt,isPrerelease,tagName \
+              --jq '[.[] | select(.isPrerelease and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-nightly-[0-9]+$")))] | sort_by(.createdAt) | reverse | .[0].tagName // ""')"
+          fi
+
+          nightly_version=''
+          if [[ -n "$nightly_tag" ]]; then
+            if [[ ! "$nightly_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
+              echo "Expected a nightly tag, got: $nightly_tag" >&2
+              exit 1
+            fi
+            nightly_version="${BASH_REMATCH[1]}"
+          fi
+
+          {
+            echo "stable_tag=$stable_tag"
+            echo "stable_version=$stable_version"
+            echo "nightly_tag=$nightly_tag"
+            echo "nightly_version=$nightly_version"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Download Debian packages
         env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_TAG: ${{ steps.release.outputs.stable_tag }}
+          VERSION: ${{ steps.release.outputs.stable_version }}
         shell: bash
         run: |
           set -euo pipefail
@@ -71,6 +101,22 @@ jobs:
             --pattern "opentubex_${VERSION}_beta_amd64.deb" \
             --pattern "opentubex_${VERSION}_beta_arm64.deb" \
             --pattern "opentubex_${VERSION}_beta_armv7l.deb"
+
+      - name: Download nightly Debian packages
+        if: steps.release.outputs.nightly_tag != ''
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.nightly_tag }}
+          VERSION: ${{ steps.release.outputs.nightly_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir nightly-files
+          gh release download "$RELEASE_TAG" \
+            --repo OpenTubeX/OpenTubeX \
+            --dir nightly-files \
+            --pattern "opentubex_${VERSION}_amd64.deb" \
+            --pattern "opentubex_${VERSION}_arm64.deb" \
+            --pattern "opentubex_${VERSION}_armv7l.deb"
 
       - name: Install repository tools
         run: sudo apt-get update && sudo apt-get install --yes apt-utils
@@ -101,7 +147,7 @@ jobs:
         env:
           APT_GPG_KEY_ID: ${{ steps.signing-key.outputs.fingerprint }}
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
-        run: ./scripts/build-repository.sh release-files repository
+        run: ./scripts/build-repository.sh release-files repository nightly-files
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0

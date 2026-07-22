@@ -16,15 +16,20 @@ sudo apt update
 sudo apt install opentubex
 ```
 
+Development snapshots are available through the opt-in `nightly` suite. Use
+the same signing key and replace `stable` with `nightly` in the source entry.
+Stable and nightly packages are indexed separately.
+
 ## How publishing works
 
-After an OpenTubeX release finishes uploading its packages, the application
-repository sends an `opentubex-release` repository dispatch containing the
+After an OpenTubeX stable or nightly release finishes uploading its packages,
+the application repository sends a repository dispatch containing the exact
 release tag. The publish workflow then:
 
-1. downloads the `amd64`, `arm64`, and ARMv7 `.deb` assets;
+1. downloads the latest stable and nightly `amd64`, `arm64`, and ARMv7 `.deb`
+   assets;
 2. validates their package names and Debian architectures;
-3. creates `Packages`, `Release`, `InRelease`, and `Release.gpg` metadata;
+3. creates isolated `stable` and `nightly` metadata;
 4. deploys the signed static repository to GitHub Pages.
 
 The workflow can also be run manually with a release tag. If no tag is given,
