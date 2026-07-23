@@ -10,7 +10,7 @@ and `armhf` systems.
 sudo install -d -m 0755 /etc/apt/keyrings
 wget -qO- https://apt.opentubex.org/opentubex-archive-keyring.gpg \
   | sudo tee /etc/apt/keyrings/opentubex-archive-keyring.gpg >/dev/null
-echo "deb [signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
+echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
   | sudo tee /etc/apt/sources.list.d/opentubex.list >/dev/null
 sudo apt update
 sudo apt install opentubex

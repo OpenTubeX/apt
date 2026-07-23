@@ -22,7 +22,7 @@
       <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
 wget -qO- https://apt.opentubex.org/opentubex-archive-keyring.gpg \
   | sudo tee /etc/apt/keyrings/opentubex-archive-keyring.gpg &gt;/dev/null
-echo "deb [signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
+echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
   | sudo tee /etc/apt/sources.list.d/opentubex.list &gt;/dev/null
 sudo apt update
 sudo apt install opentubex</code></pre>
@@ -31,7 +31,7 @@ sudo apt install opentubex</code></pre>
     <h2>Nightly builds</h2>
     <p>To follow development snapshots, use the same key with the nightly suite:</p>
     <div class="card">
-      <pre><code>echo "deb [signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org nightly main" \
+      <pre><code>echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org nightly main" \
   | sudo tee /etc/apt/sources.list.d/opentubex.list &gt;/dev/null
 sudo apt update
 sudo apt install opentubex</code></pre>
