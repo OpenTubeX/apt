@@ -46,9 +46,11 @@ jobs:
           requested_tag="$INPUT_TAG"
           stable_tag=''
           nightly_tag=''
+          promote_stable=false
 
           if [[ "$requested_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
             stable_tag="$requested_tag"
+            promote_stable=true
           elif [[ "$requested_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
             nightly_tag="$requested_tag"
           elif [[ -n "$requested_tag" ]]; then
@@ -58,6 +60,9 @@ jobs:
 
           if [[ -z "$stable_tag" ]]; then
             stable_tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
+            if [[ -z "$requested_tag" ]]; then
+              promote_stable=true
+            fi
           fi
           if [[ ! "$stable_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
             echo "Expected a stable tag, got: $stable_tag" >&2
@@ -85,6 +90,7 @@ jobs:
             echo "stable_version=$stable_version"
             echo "nightly_tag=$nightly_tag"
             echo "nightly_version=$nightly_version"
+            echo "promote_stable=$promote_stable"
           } >> "$GITHUB_OUTPUT"
 
       - name: Download Debian packages
@@ -103,7 +109,7 @@ jobs:
             --pattern "opentubex_${VERSION}_beta_armv7l.deb"
 
       - name: Download nightly Debian packages
-        if: steps.release.outputs.nightly_tag != ''
+        if: steps.release.outputs.promote_stable != 'true' && steps.release.outputs.nightly_tag != ''
         env:
           RELEASE_TAG: ${{ steps.release.outputs.nightly_tag }}
           VERSION: ${{ steps.release.outputs.nightly_version }}
@@ -117,6 +123,10 @@ jobs:
             --pattern "opentubex_${VERSION}_amd64.deb" \
             --pattern "opentubex_${VERSION}_arm64.deb" \
             --pattern "opentubex_${VERSION}_armv7l.deb"
+
+      - name: Promote stable Debian packages to nightly
+        if: steps.release.outputs.promote_stable == 'true'
+        run: cp --recursive release-files nightly-files
 
       - name: Install repository tools
         run: sudo apt-get update && sudo apt-get install --yes apt-utils
