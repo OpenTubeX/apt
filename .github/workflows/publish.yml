@@ -117,12 +117,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir nightly-files
-          gh release download "$RELEASE_TAG" \
-            --repo OpenTubeX/OpenTubeX \
-            --dir nightly-files \
-            --pattern "opentubex_${VERSION}_amd64.deb" \
-            --pattern "opentubex_${VERSION}_arm64.deb" \
-            --pattern "opentubex_${VERSION}_armv7l.deb"
+          for arch in amd64 arm64 armv7l; do
+            asset="opentubex_${VERSION}_${arch}.deb"
+            wget --quiet \
+              --output-document="nightly-files/${asset}" \
+              "https://github.com/OpenTubeX/OpenTubeX/releases/download/${RELEASE_TAG}/${asset}"
+          done
 
       - name: Promote stable Debian packages to nightly
         if: steps.release.outputs.promote_stable == 'true'
