@@ -104,6 +104,7 @@ fi
 pushd "$repository_directory" >/dev/null
 gpg --batch --export "$APT_GPG_KEY_ID" > opentubex-archive-keyring.gpg
 cp ../static/CNAME ../static/code-blocks.js ../static/favicon.ico \
-  ../static/favicon.svg ../static/index.html ../static/style.css .
+  ../static/favicon.svg ../static/index.html ../static/og.png \
+  ../static/style.css .
 touch .nojekyll
 popd >/dev/null
