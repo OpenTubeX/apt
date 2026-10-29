@@ -26,11 +26,31 @@ fi
 rm -rf -- "$repository_directory"
 mkdir -p "$repository_directory"
 
+# Replaces only the control archive, so the package contents stay unchanged.
+set_package_version() {
+  local package destination version=$2 work control_member data_member
+  package=$(realpath "$1")
+  destination=$(realpath -m "$3")
+  work=$(mktemp -d)
+  control_member=$(ar t "$package" | grep '^control\.tar')
+  data_member=$(ar t "$package" | grep '^data\.tar')
+  (
+    cd "$work"
+    ar x "$package"
+    mkdir control
+    tar -xf "$control_member" -C control
+    sed -i "s/^Version: .*/Version: $version/" control/control
+    tar --create --xz --file=control.tar.xz --owner=0 --group=0 --numeric-owner --sort=name -C control .
+    ar rcD "$destination" debian-binary control.tar.xz "$data_member"
+  )
+  rm -rf -- "$work"
+}
+
 publish_suite() {
   local source_directory=$1
   local suite=$2
   local pool_directory="$repository_directory/pool/$suite/main/o/opentubex"
-  local package package_name architecture package_index architectures_list
+  local package package_name architecture version package_index architectures_list
   local -a packages architectures
 
   mapfile -t packages < <(find "$source_directory" -maxdepth 1 -type f -name '*.deb' -print | sort)
@@ -59,7 +79,15 @@ publish_suite() {
     esac
 
     architectures+=("$architecture")
-    cp "$package" "$pool_directory/"
+    version=$(dpkg-deb --field "$package" Version)
+    # Nightlies are built after the release they are numbered after, so
+    # 0.37.0.nightly.2527 must sort between the 0.37.0 and 0.37.1 releases.
+    if [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)~nightly~([0-9]+)$ ]]; then
+      version="${BASH_REMATCH[1]}.nightly.${BASH_REMATCH[2]}"
+      set_package_version "$package" "$version" "$pool_directory/opentubex_${version}_${architecture}.deb"
+    else
+      cp "$package" "$pool_directory/"
+    fi
   done
 
   mapfile -t architectures < <(printf '%s\n' "${architectures[@]}" | sort -u)
