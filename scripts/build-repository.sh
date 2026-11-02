@@ -71,7 +71,7 @@ publish_suite() {
     fi
 
     case "$architecture" in
-      amd64|arm64|armhf) ;;
+      amd64|arm64) ;;
       *)
         printf 'Unsupported Debian architecture %s in %s\n' "$architecture" "$package" >&2
         exit 1

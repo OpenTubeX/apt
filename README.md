@@ -1,8 +1,8 @@
 # OpenTubeX APT repository
 
 This repository publishes signed OpenTubeX packages for Debian and Ubuntu at
-[apt.opentubex.org](https://apt.opentubex.org). It supports `amd64`, `arm64`,
-and `armhf` systems.
+[apt.opentubex.org](https://apt.opentubex.org). It supports `amd64` and `arm64`
+systems.
 
 ## Install OpenTubeX
 
@@ -10,7 +10,7 @@ and `armhf` systems.
 sudo install -d -m 0755 /etc/apt/keyrings
 wget -qO- https://apt.opentubex.org/opentubex-archive-keyring.gpg \
   | sudo tee /etc/apt/keyrings/opentubex-archive-keyring.gpg >/dev/null
-echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
+echo "deb [arch=amd64,arm64 signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
   | sudo tee /etc/apt/sources.list.d/opentubex.list >/dev/null
 sudo apt update
 sudo apt install opentubex
@@ -26,8 +26,7 @@ After an OpenTubeX stable or nightly release finishes uploading its packages,
 the application repository sends a repository dispatch containing the exact
 release tag. The publish workflow then:
 
-1. downloads the latest stable and nightly `amd64`, `arm64`, and ARMv7 `.deb`
-   assets;
+1. downloads the latest stable and nightly `amd64` and `arm64` `.deb` assets;
 2. validates their package names and Debian architectures;
 3. creates isolated `stable` and `nightly` metadata;
 4. deploys the signed static repository to GitHub Pages.

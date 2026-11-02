@@ -105,8 +105,7 @@ jobs:
             --repo OpenTubeX/OpenTubeX \
             --dir release-files \
             --pattern "opentubex_${VERSION}_beta_amd64.deb" \
-            --pattern "opentubex_${VERSION}_beta_arm64.deb" \
-            --pattern "opentubex_${VERSION}_beta_armv7l.deb"
+            --pattern "opentubex_${VERSION}_beta_arm64.deb"
 
       - name: Download nightly Debian packages
         if: steps.release.outputs.promote_stable != 'true' && steps.release.outputs.nightly_tag != ''
@@ -117,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir nightly-files
-          for arch in amd64 arm64 armv7l; do
+          for arch in amd64 arm64; do
             asset="opentubex_${VERSION}_${arch}.deb"
             wget --quiet \
               --output-document="nightly-files/${asset}" \
