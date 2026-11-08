@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
+# Builds the signed stable and nightly APT repositories.
+# Usage: build-repository.sh STABLE_DIRECTORY REPOSITORY_DIRECTORY NIGHTLY_DIRECTORY
 
 set -euo pipefail
 
-stable_directory=${1:-release-files}
-repository_directory=${2:-repository}
-nightly_directory=${3:-}
-component=${APT_COMPONENT:-main}
-origin=${APT_ORIGIN:-OpenTubeX}
-label=${APT_LABEL:-OpenTubeX}
-description=${APT_DESCRIPTION:-Official OpenTubeX packages}
+stable_directory=$1
+repository_directory=$2
+nightly_directory=$3
+component=main
 
-if [[ ! -d "$stable_directory" ]]; then
-  printf 'Package directory does not exist: %s\n' "$stable_directory" >&2
-  exit 1
-fi
+for directory in "$stable_directory" "$nightly_directory"; do
+  if [[ ! -d "$directory" ]]; then
+    printf 'Package directory does not exist: %s\n' "$directory" >&2
+    exit 1
+  fi
+done
 
 if [[ -z "$repository_directory" || "$repository_directory" == '/' || "$repository_directory" == '.' ]]; then
   printf 'Unsafe repository directory: %s\n' "$repository_directory" >&2
@@ -27,6 +28,8 @@ rm -rf -- "$repository_directory"
 mkdir -p "$repository_directory"
 
 # Replaces only the control archive, so the package contents stay unchanged.
+# Fixed metadata keeps the result identical when the same nightly is published
+# again, so clients with cached indexes still match its checksum.
 set_package_version() {
   local package destination version=$2 work control_member data_member
   package=$(realpath "$1")
@@ -40,17 +43,23 @@ set_package_version() {
     mkdir control
     tar -xf "$control_member" -C control
     sed -i "s/^Version: .*/Version: $version/" control/control
-    tar --create --xz --file=control.tar.xz --owner=0 --group=0 --numeric-owner --sort=name -C control .
+    tar --create --xz --file=control.tar.xz --owner=0 --group=0 --numeric-owner \
+      --sort=name --mtime=@0 -C control .
     ar rcD "$destination" debian-binary control.tar.xz "$data_member"
   )
   rm -rf -- "$work"
+}
+
+sign() {
+  gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 \
+    --local-user "$APT_GPG_KEY_ID" "$@" 3<<< "$APT_GPG_PASSPHRASE"
 }
 
 publish_suite() {
   local source_directory=$1
   local suite=$2
   local pool_directory="$repository_directory/pool/$suite/main/o/opentubex"
-  local package package_name architecture version package_index architectures_list
+  local package package_name architecture version package_index release
   local -a packages architectures
 
   mapfile -t packages < <(find "$source_directory" -maxdepth 1 -type f -name '*.deb' -print | sort)
@@ -100,34 +109,27 @@ publish_suite() {
     gzip --keep --no-name --best "$package_index/Packages"
   done
 
-  architectures_list=$(printf '%s ' "${architectures[@]}")
-  architectures_list=${architectures_list% }
-
+  # Write Release outside the indexed directory so it does not list itself.
+  release=$(mktemp)
   apt-ftparchive \
-    -o "APT::FTPArchive::Release::Origin=$origin" \
-    -o "APT::FTPArchive::Release::Label=$label" \
+    -o "APT::FTPArchive::Release::Origin=OpenTubeX" \
+    -o "APT::FTPArchive::Release::Label=OpenTubeX" \
     -o "APT::FTPArchive::Release::Suite=$suite" \
     -o "APT::FTPArchive::Release::Codename=$suite" \
-    -o "APT::FTPArchive::Release::Architectures=$architectures_list" \
+    -o "APT::FTPArchive::Release::Architectures=${architectures[*]}" \
     -o "APT::FTPArchive::Release::Components=$component" \
-    -o "APT::FTPArchive::Release::Description=$description ($suite)" \
-    release "dists/$suite" > "dists/$suite/Release"
+    -o "APT::FTPArchive::Release::Description=Official OpenTubeX packages ($suite)" \
+    release "dists/$suite" > "$release"
+  mv "$release" "dists/$suite/Release"
+  chmod 0644 "dists/$suite/Release"
 
-  gpg --batch --yes --pinentry-mode loopback \
-    --passphrase "$APT_GPG_PASSPHRASE" \
-    --local-user "$APT_GPG_KEY_ID" \
-    --clearsign --output "dists/$suite/InRelease" "dists/$suite/Release"
-  gpg --batch --yes --pinentry-mode loopback \
-    --passphrase "$APT_GPG_PASSPHRASE" \
-    --local-user "$APT_GPG_KEY_ID" \
-    --armor --detach-sign --output "dists/$suite/Release.gpg" "dists/$suite/Release"
+  sign --clearsign --output "dists/$suite/InRelease" "dists/$suite/Release"
+  sign --armor --detach-sign --output "dists/$suite/Release.gpg" "dists/$suite/Release"
   popd >/dev/null
 }
 
 publish_suite "$stable_directory" stable
-if [[ -n "$nightly_directory" && -d "$nightly_directory" ]]; then
-  publish_suite "$nightly_directory" nightly
-fi
+publish_suite "$nightly_directory" nightly
 
 pushd "$repository_directory" >/dev/null
 gpg --batch --export "$APT_GPG_KEY_ID" > opentubex-archive-keyring.gpg
