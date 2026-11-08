@@ -4,11 +4,6 @@ on:
   repository_dispatch:
     types: [opentubex-release, opentubex-nightly]
   workflow_dispatch:
-    inputs:
-      releaseTag:
-        description: Release tag to publish (for example, v0.29.0-beta)
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -40,92 +35,66 @@ jobs:
         id: release
         shell: bash
         env:
-          INPUT_TAG: ${{ github.event.client_payload.tag || inputs.releaseTag }}
+          REQUESTED_TAG: ${{ github.event.client_payload.tag }}
         run: |
           set -euo pipefail
-          requested_tag="$INPUT_TAG"
-          stable_tag=''
-          nightly_tag=''
-          promote_stable=false
+          stable_tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
+          nightly_tag="$(gh release list --repo OpenTubeX/OpenTubeX --limit 100 \
+            --json isPrerelease,publishedAt,tagName \
+            --jq '[.[] | select(.isPrerelease and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-nightly-[0-9]+$")))] | sort_by(.publishedAt) | last | .tagName // ""')"
 
-          if [[ "$requested_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
-            stable_tag="$requested_tag"
-            promote_stable=true
-          elif [[ "$requested_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
-            nightly_tag="$requested_tag"
-          elif [[ -n "$requested_tag" ]]; then
-            echo "Expected a stable or nightly OpenTubeX tag, got: $requested_tag" >&2
+          # Release listings can lag behind, so the dispatched tag takes precedence.
+          if [[ "$REQUESTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta$ ]]; then
+            stable_tag="$REQUESTED_TAG"
+          elif [[ "$REQUESTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+$ ]]; then
+            nightly_tag="$REQUESTED_TAG"
+          elif [[ -n "$REQUESTED_TAG" ]]; then
+            echo "Expected a stable or nightly OpenTubeX tag, got: $REQUESTED_TAG" >&2
             exit 1
           fi
 
-          if [[ -z "$stable_tag" ]]; then
-            stable_tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
-            if [[ -z "$requested_tag" ]]; then
-              promote_stable=true
-            fi
-          fi
-          if [[ ! "$stable_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
+          if [[ ! "$stable_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta$ ]]; then
             echo "Expected a stable tag, got: $stable_tag" >&2
             exit 1
           fi
-          stable_version="${BASH_REMATCH[1]}"
 
-          if [[ -z "$nightly_tag" ]]; then
-            nightly_tag="$(gh release list --repo OpenTubeX/OpenTubeX --limit 100 \
-              --json createdAt,isPrerelease,tagName \
-              --jq '[.[] | select(.isPrerelease and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-nightly-[0-9]+$")))] | sort_by(.createdAt) | reverse | .[0].tagName // ""')"
-          fi
-
-          nightly_version=''
-          if [[ -n "$nightly_tag" ]]; then
-            if [[ ! "$nightly_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
-              echo "Expected a nightly tag, got: $nightly_tag" >&2
-              exit 1
-            fi
-            nightly_version="${BASH_REMATCH[1]}"
+          # The nightly suite follows whichever of the two was published last.
+          published_at() {
+            gh release view "$1" --repo OpenTubeX/OpenTubeX --json publishedAt --jq .publishedAt
+          }
+          if [[ -z "$nightly_tag" || "$(published_at "$stable_tag")" > "$(published_at "$nightly_tag")" ]]; then
+            nightly_tag="$stable_tag"
           fi
 
           {
             echo "stable_tag=$stable_tag"
-            echo "stable_version=$stable_version"
             echo "nightly_tag=$nightly_tag"
-            echo "nightly_version=$nightly_version"
-            echo "promote_stable=$promote_stable"
           } >> "$GITHUB_OUTPUT"
 
+      # Release lookups by tag can omit newly uploaded assets, so download directly.
       - name: Download Debian packages
         env:
-          RELEASE_TAG: ${{ steps.release.outputs.stable_tag }}
-          VERSION: ${{ steps.release.outputs.stable_version }}
+          STABLE_TAG: ${{ steps.release.outputs.stable_tag }}
+          NIGHTLY_TAG: ${{ steps.release.outputs.nightly_tag }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir release-files
-          gh release download "$RELEASE_TAG" \
-            --repo OpenTubeX/OpenTubeX \
-            --dir release-files \
-            --pattern "opentubex_${VERSION}_beta_amd64.deb" \
-            --pattern "opentubex_${VERSION}_beta_arm64.deb"
+          download() {
+            local tag=$1 directory=$2 version=${1#v}
+            version=${version/%-beta/_beta}
+            mkdir -p "$directory"
+            for arch in amd64 arm64; do
+              wget --quiet --tries=3 --directory-prefix="$directory" \
+                "https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${version}_${arch}.deb"
+            done
+          }
 
-      - name: Download nightly Debian packages
-        if: steps.release.outputs.promote_stable != 'true' && steps.release.outputs.nightly_tag != ''
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.nightly_tag }}
-          VERSION: ${{ steps.release.outputs.nightly_version }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir nightly-files
-          for arch in amd64 arm64; do
-            asset="opentubex_${VERSION}_${arch}.deb"
-            wget --quiet \
-              --output-document="nightly-files/${asset}" \
-              "https://github.com/OpenTubeX/OpenTubeX/releases/download/${RELEASE_TAG}/${asset}"
-          done
-
-      - name: Promote stable Debian packages to nightly
-        if: steps.release.outputs.promote_stable == 'true'
-        run: cp --recursive release-files nightly-files
+          download "$STABLE_TAG" release-files
+          if [[ "$NIGHTLY_TAG" == "$STABLE_TAG" ]]; then
+            cp --recursive release-files nightly-files
+          else
+            download "$NIGHTLY_TAG" nightly-files
+          fi
 
       - name: Install repository tools
         run: sudo apt-get update && sudo apt-get install --yes apt-utils
