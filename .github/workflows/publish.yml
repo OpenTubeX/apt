@@ -84,7 +84,8 @@ jobs:
             version=${version/%-beta/_beta}
             mkdir -p "$directory"
             for arch in amd64 arm64; do
-              wget --quiet --tries=3 --directory-prefix="$directory" \
+              wget --quiet --tries=5 --waitretry=30 --retry-on-http-error=429,500,502,503,504 \
+                --directory-prefix="$directory" \
                 "https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${version}_${arch}.deb"
             done
           }
