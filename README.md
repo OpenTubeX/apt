@@ -10,15 +10,31 @@ systems.
 sudo install -d -m 0755 /etc/apt/keyrings
 wget -qO- https://apt.opentubex.org/opentubex-archive-keyring.gpg \
   | sudo tee /etc/apt/keyrings/opentubex-archive-keyring.gpg >/dev/null
-echo "deb [arch=amd64,arm64 signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
-  | sudo tee /etc/apt/sources.list.d/opentubex.list >/dev/null
+sudo tee /etc/apt/sources.list.d/opentubex.sources >/dev/null <<'EOF'
+Types: deb
+URIs: https://apt.opentubex.org
+Suites: stable
+Components: main
+Signed-By: /etc/apt/keyrings/opentubex-archive-keyring.gpg
+EOF
 sudo apt update
 sudo apt install opentubex
 ```
 
-Development snapshots are available through the opt-in `nightly` suite. Use
-the same signing key and replace `stable` with `nightly` in the source entry.
-Stable and nightly packages are indexed separately.
+If you set up the repository with the older one-line
+`/etc/apt/sources.list.d/opentubex.list` entry, delete that file after adding
+`opentubex.sources`.
+
+Development snapshots are available through the opt-in `nightly` suite:
+
+```sh
+sudo sed -i 's/^Suites: stable$/Suites: nightly/' /etc/apt/sources.list.d/opentubex.sources
+sudo apt update
+sudo apt install opentubex
+```
+
+Stable and nightly packages are indexed separately. The nightly suite carries
+the latest stable release while it is newer than the latest nightly.
 
 ## How publishing works
 
@@ -26,13 +42,15 @@ After an OpenTubeX stable or nightly release finishes uploading its packages,
 the application repository sends a repository dispatch containing the exact
 release tag. The publish workflow then:
 
-1. downloads the latest stable and nightly `amd64` and `arm64` `.deb` assets;
-2. validates their package names and Debian architectures;
-3. creates isolated `stable` and `nightly` metadata;
-4. deploys the signed static repository to GitHub Pages.
+1. resolves the latest stable release and the latest nightly; the nightly suite
+   follows whichever of the two was published last;
+2. downloads their `amd64` and `arm64` `.deb` assets;
+3. validates their package names and Debian architectures;
+4. creates isolated `stable` and `nightly` metadata;
+5. deploys the signed static repository to GitHub Pages.
 
-The workflow can also be run manually with a release tag. If no tag is given,
-it publishes the latest release.
+The workflow can also be run manually. It then publishes the latest stable
+release and nightly.
 
 ## Maintainer setup
 
@@ -43,7 +61,7 @@ it publishes the latest release.
    `apt.opentubex.org` as the custom domain.
 4. Add a DNS `CNAME` record from `apt.opentubex.org` to
    `opentubex.github.io`.
-5. Run the **Publish APT repository** workflow once with a stable release tag.
+5. Run the **Publish APT repository** workflow once.
 
 The OpenTubeX application repository uses its existing `PUSH_TOKEN` secret to
 send the cross-repository dispatch. That token needs write access to this

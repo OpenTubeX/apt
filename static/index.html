@@ -33,17 +33,26 @@
       <pre><code class="language-shell">sudo install -d -m 0755 /etc/apt/keyrings
 wget -qO- https://apt.opentubex.org/opentubex-archive-keyring.gpg \
   | sudo tee /etc/apt/keyrings/opentubex-archive-keyring.gpg &gt;/dev/null
-echo "deb [arch=amd64,arm64 signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org stable main" \
-  | sudo tee /etc/apt/sources.list.d/opentubex.list &gt;/dev/null
+sudo tee /etc/apt/sources.list.d/opentubex.sources &gt;/dev/null &lt;&lt;'EOF'
+Types: deb
+URIs: https://apt.opentubex.org
+Suites: stable
+Components: main
+Signed-By: /etc/apt/keyrings/opentubex-archive-keyring.gpg
+EOF
 sudo apt update
 sudo apt install opentubex</code></pre>
     </div>
+    <p>
+      If you set up the repository with the older one-line
+      <code>opentubex.list</code> entry, delete that file after adding
+      <code>opentubex.sources</code>.
+    </p>
 
     <h2 id="nightly-builds">Nightly builds</h2>
-    <p>To follow development snapshots, use the same key with the nightly suite:</p>
+    <p>To follow development snapshots, switch to the nightly suite:</p>
     <div class="card">
-      <pre><code class="language-shell">echo "deb [arch=amd64,arm64 signed-by=/etc/apt/keyrings/opentubex-archive-keyring.gpg] https://apt.opentubex.org nightly main" \
-  | sudo tee /etc/apt/sources.list.d/opentubex.list &gt;/dev/null
+      <pre><code class="language-shell">sudo sed -i 's/^Suites: stable$/Suites: nightly/' /etc/apt/sources.list.d/opentubex.sources
 sudo apt update
 sudo apt install opentubex</code></pre>
     </div>
