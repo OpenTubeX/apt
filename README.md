@@ -49,8 +49,8 @@ release tag. The publish workflow then:
 4. creates isolated `stable` and `nightly` metadata;
 5. deploys the signed static repository to GitHub Pages.
 
-The workflow can also be run manually. It then publishes the latest stable
-release and nightly.
+The workflow can also be run manually. It publishes the latest stable release
+and nightly, or the release given as `releaseTag`.
 
 ## Maintainer setup
 

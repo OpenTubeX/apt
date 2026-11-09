@@ -4,6 +4,11 @@ on:
   repository_dispatch:
     types: [opentubex-release, opentubex-nightly]
   workflow_dispatch:
+    inputs:
+      releaseTag:
+        description: Release tag to publish (for example, v0.29.0-beta). Leave empty for the latest releases.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -35,7 +40,7 @@ jobs:
         id: release
         shell: bash
         env:
-          REQUESTED_TAG: ${{ github.event.client_payload.tag }}
+          REQUESTED_TAG: ${{ github.event.client_payload.tag || inputs.releaseTag }}
         run: |
           set -euo pipefail
           stable_tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
