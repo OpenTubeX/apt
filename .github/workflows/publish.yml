@@ -89,8 +89,10 @@ jobs:
             version=${version/%-beta/_beta}
             mkdir -p "$directory"
             for arch in amd64 arm64; do
-              wget --quiet --tries=5 --waitretry=30 --retry-on-http-error=429,500,502,503,504 \
-                --directory-prefix="$directory" \
+              # wget gives up on some network errors despite --tries; curl retries every failure.
+              curl --fail --silent --show-error --location \
+                --retry 5 --retry-all-errors --retry-delay 30 \
+                --output "$directory/opentubex_${version}_${arch}.deb" \
                 "https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${version}_${arch}.deb"
             done
           }
